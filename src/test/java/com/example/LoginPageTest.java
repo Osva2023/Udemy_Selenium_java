@@ -3,98 +3,114 @@ package com.example;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assertions;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.openqa.selenium.support.ui.Select;
-import org.openqa.selenium.Alert;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import org.openqa.selenium.chrome.ChromeDriver;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * Automation test for Login Page Practice from Rahul Shetty Academy
  */
 public class LoginPageTest {
-    
+
     private WebDriver driver;
     private WebDriverWait wait;
     private static final String URL = "https://rahulshettyacademy.com/loginpagepractise";
+    private static final String SHOP_URL_FRAGMENT = "/angularpractice/shop";
     private static final int TIMEOUT = 10;
-    
+
     @BeforeEach
     public void setUp() {
         // Initialize WebDriver
         WebDriverManager.chromedriver().setup();
         driver = new ChromeDriver();
         wait = new WebDriverWait(driver, Duration.ofSeconds(TIMEOUT));
-        
+
         // Navigate to the login page
         driver.get(URL);
     }
-    
+
     @AfterEach
     public void tearDown() {
         if (driver != null) {
             driver.quit();
         }
     }
-    
+
     @Test
-    public void testLoginWithUserRoleAndAlert() {
+    public void testLoginWithUserRoleAndModal() {
         // Step 1: Fill username
-        // TODO: Add username selector
-        WebElement usernameField = driver.findElement(By.id("username")); // Placeholder
+        WebElement usernameField = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("username")));
         usernameField.sendKeys("rahulshettyacademy");
-        
+
         // Step 2: Fill password
-        // TODO: Add password selector
-        WebElement passwordField = driver.findElement(By.id("password")); // Placeholder
-        passwordField.sendKeys("learning");
-        
-        // Step 3: Check the User checkbox
-        // TODO: Add user checkbox selector
-        WebElement userCheckbox = driver.findElement(By.id("chkboxOne")); // Placeholder
-        userCheckbox.click();
-        
-        // Step 4: Handle alert pop-up that appears after checking User checkbox
-        // TODO: Verify alert appears and click OK
+        WebElement passwordField = driver.findElement(By.id("password"));
+        passwordField.sendKeys("Learning@830$3mK2");
+
+        // Step 3: Select the User radio option
+        WebElement userRadioLabel = driver
+                .findElement(By.xpath("//label[contains(@class,'customradio')][.//input[@id='usertype']]"));
+        userRadioLabel.click();
+
+        // Step 4: Accept the confirmation modal for User if it appears
         try {
-            Alert alert = wait.until(d -> {
-                try {
-                    return d.switchTo().alert();
-                } catch (Exception e) {
-                    return null;
-                }
-            });
-            if (alert != null) {
-                System.out.println("Alert text: " + alert.getText());
-                alert.accept(); // Click OK on alert
-            }
-        } catch (Exception e) {
-            System.out.println("Alert handling: " + e.getMessage());
+            WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(2));
+            WebElement okButton = shortWait.until(ExpectedConditions.elementToBeClickable(By.id("okayBtn")));
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", okButton);
+        } catch (TimeoutException ignored) {
+            // Some runs don't show the modal; continue test flow.
         }
-        
+
         // Step 5: Select 'Consultant' from dropdown
-        // TODO: Add dropdown selector and verify 'Consultant' option
-        WebElement dropdown = driver.findElement(By.id("exampleFormControlSelect1")); // Placeholder
+        WebElement dropdown = driver.findElement(By.cssSelector("select.form-control"));
         Select select = new Select(dropdown);
-        select.selectByValue("consultant"); // or selectByVisibleText("Consultant")
-        
+        select.selectByValue("consult");
+
         // Step 6: Accept Terms and Conditions checkbox
-        // TODO: Add terms checkbox selector
-        WebElement termsCheckbox = driver.findElement(By.id("terms")); // Placeholder
+        WebElement termsCheckbox = driver.findElement(By.id("terms"));
         termsCheckbox.click();
-        
+
         // Step 7: Click Submit button
-        // TODO: Add submit button selector
-        WebElement submitButton = driver.findElement(By.id("signInBtn")); // Placeholder
+        WebElement submitButton = driver.findElement(By.id("signInBtn"));
         submitButton.click();
-        
+
         // Step 8: Wait for the next page to load
-        // TODO: Add verification for the next page (title, URL, or specific element)
-        wait.until(d -> d.getTitle().contains("success")); // Placeholder - adjust based on actual page
+        wait.until(ExpectedConditions.urlContains(SHOP_URL_FRAGMENT));
+        Assertions.assertTrue(driver.getCurrentUrl().contains(SHOP_URL_FRAGMENT));
+
+        // Step 9: Add all available items to the cart dynamically
+        By addButtonSelector = By.cssSelector("app-card .card-footer .btn.btn-info");
+        wait.until(ExpectedConditions.numberOfElementsToBeMoreThan(addButtonSelector, 0));
+        List<WebElement> addButtons = driver.findElements(addButtonSelector);
+
+        int itemsToAdd = addButtons.size();
+        for (WebElement addButton : addButtons) {
+            addButton.click();
+        }
+
+        // Step 10: Assert checkout counter matches selected item count
+        By checkoutButtonSelector = By.xpath("//a[contains(@class,'nav-link') and contains(.,'Checkout')]");
+        wait.until(
+                ExpectedConditions.textToBePresentInElementLocated(checkoutButtonSelector, String.valueOf(itemsToAdd)));
+
+        String checkoutText = driver.findElement(checkoutButtonSelector).getText();
+        int checkoutCount = Integer.parseInt(checkoutText.replaceAll("[^0-9]", ""));
+        Assertions.assertEquals(itemsToAdd, checkoutCount);
+
+        // Step 11: Click Checkout and wait for checkout view to load
+        driver.findElement(checkoutButtonSelector).click();
+        By checkoutTableSelector = By.cssSelector("table.table.table-hover");
+        WebElement checkoutTable = wait.until(ExpectedConditions.visibilityOfElementLocated(checkoutTableSelector));
+        Assertions.assertTrue(checkoutTable.isDisplayed());
     }
 }
